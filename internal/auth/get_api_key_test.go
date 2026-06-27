@@ -10,8 +10,7 @@ func TestGetAPIKey(t *testing.T) {
 	headers.Set("Authorization", "ApiKey 1234567890")
 
 	got, _ := GetAPIKey(headers)
-	// want := "1234567890"
-	want := "1234567899"
+	want := "1234567890"
 
 	if got != want {
 		t.Fatalf("expected: %v, got: %v", want, got)
