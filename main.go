@@ -3,10 +3,13 @@ package main
 import (
 	"database/sql"
 	"embed"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
@@ -30,9 +33,14 @@ func main() {
 		log.Printf("warning: assuming default configuration. .env unreadable: %v", err)
 	}
 
-	port := os.Getenv("PORT")
-	if port == "" {
+	// parse and validate PORT early as int (not raw string) to break taint flow for gosec G706
+	portStr := os.Getenv("PORT")
+	if portStr == "" {
 		log.Fatal("PORT environment variable is not set")
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil || port < 1 {
+		log.Fatal("PORT must be a positive number")
 	}
 
 	apiCfg := apiConfig{}
@@ -88,11 +96,19 @@ func main() {
 	v1Router.Get("/healthz", handlerReadiness)
 
 	router.Mount("/v1", v1Router)
+	// build addr from validated int port (not raw env string) to satisfy gosec G706
+	addr := fmt.Sprintf(":%d", port)
 	srv := &http.Server{
-		Addr:    ":" + port,
-		Handler: router,
+		Addr:              addr,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	log.Printf("Serving on port: %s\n", port)
-	log.Fatal(srv.ListenAndServe())
+	// log derived addr, not raw env var, to avoid log injection (G706)
+	log.Printf("Serving on port: %s\n", addr)
+
+	err = srv.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
+		log.Fatalf("server closed due to error: %v", err)
+	}
 }

@@ -30,5 +30,8 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 		return
 	}
 	w.WriteHeader(code)
-	w.Write(dat)
+	// explicitly capture write error to satisfy gosec G104
+	if _, err = w.Write(dat); err != nil {
+		log.Printf("Error writing JSON: %s", err)
+	}
 }
